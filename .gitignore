@@ -42,3 +42,8 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# For Me
+Frontend-Auth-Integration.postman_collection.json
+*.md
+!README.md
