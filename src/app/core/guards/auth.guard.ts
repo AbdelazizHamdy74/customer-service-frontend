@@ -1,13 +1,13 @@
-import { Injectable, PLATFORM_ID, Inject } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import { PLATFORM_ID, inject } from '@angular/core';
 import {
-  Router,
-  CanActivateFn,
   ActivatedRouteSnapshot,
+  CanActivateFn,
+  Router,
   RouterStateSnapshot,
 } from '@angular/router';
 import { AuthService } from '../services/auth.service';
-import { inject } from '@angular/core';
-import { isPlatformBrowser } from '@angular/common';
+import { getRoleDashboardPath } from '../utils/role-path.util';
 
 export const authGuard: CanActivateFn = (
   route: ActivatedRouteSnapshot,
@@ -22,7 +22,6 @@ export const authGuard: CanActivateFn = (
     return true;
   }
 
-  // Store the attempted URL for redirecting after login (only in browser)
   if (isBrowser) {
     sessionStorage.setItem('redirectUrl', state.url);
   }
@@ -31,18 +30,13 @@ export const authGuard: CanActivateFn = (
   return false;
 };
 
-export const publicGuard: CanActivateFn = (
-  route: ActivatedRouteSnapshot,
-  state: RouterStateSnapshot,
-) => {
+export const publicGuard: CanActivateFn = () => {
   const router = inject(Router);
   const authService = inject(AuthService);
 
   if (authService.isAuthenticated()) {
-    // Redirect to dashboard or home based on role
     const user = authService.getCurrentUser();
-    const rolePath = getRoleBasedPath(user?.role || '');
-    router.navigate([rolePath]);
+    router.navigate([getRoleBasedPath(user?.role || '')]);
     return false;
   }
 
@@ -50,7 +44,7 @@ export const publicGuard: CanActivateFn = (
 };
 
 export const roleGuard = (allowedRoles: string[]): CanActivateFn => {
-  return (route: ActivatedRouteSnapshot, state: RouterStateSnapshot) => {
+  return () => {
     const router = inject(Router);
     const authService = inject(AuthService);
 
@@ -63,22 +57,11 @@ export const roleGuard = (allowedRoles: string[]): CanActivateFn => {
       return true;
     }
 
-    // User is authenticated but doesn't have the required role
     router.navigate(['/unauthorized']);
     return false;
   };
 };
 
-/**
- * Get path based on user role
- */
 export function getRoleBasedPath(role: string): string {
-  const rolePaths: { [key: string]: string } = {
-    ADMIN: '/admin/dashboard',
-    SUPERVISOR: '/supervisor/dashboard',
-    AGENT: '/agent/dashboard',
-    CUSTOMER: '/customer/dashboard',
-  };
-
-  return rolePaths[role] || '/dashboard';
+  return getRoleDashboardPath(role);
 }

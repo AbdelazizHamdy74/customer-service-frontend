@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 import { HttpErrorResponse } from '@angular/common/http';
+import { getRoleDashboardPath } from '../../core/utils/role-path.util';
 
 @Component({
   selector: 'app-login',
@@ -202,7 +203,7 @@ export class LoginComponent {
         } else {
           // Navigate based on user role
           const user = response.data.user;
-          this.router.navigate([this.getRoleBasedPath(user.role)]);
+          this.router.navigate([getRoleDashboardPath(user.role)]);
         }
       },
       error: (error: HttpErrorResponse) => {
@@ -210,19 +211,6 @@ export class LoginComponent {
         // Error is already handled by the auth service
       },
     });
-  }
-
-  /**
-   * Get path based on user role
-   */
-  private getRoleBasedPath(role: string): string {
-    const rolePaths: { [key: string]: string } = {
-      ADMIN: '/admin/dashboard',
-      SUPERVISOR: '/supervisor/dashboard',
-      AGENT: '/agent/dashboard',
-      CUSTOMER: '/customer/dashboard',
-    };
-    return rolePaths[role] || '/dashboard';
   }
 
   /**
