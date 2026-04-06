@@ -9,6 +9,9 @@ import { UnauthorizedComponent } from './auth/pages/unauthorized.component';
 import { authGuard, publicGuard, roleGuard } from './core/guards/auth.guard';
 import { AuthService } from './core/services/auth.service';
 import { getRoleDashboardPath } from './core/utils/role-path.util';
+import { AgentDetailsComponent } from './modules/agents/pages/agent-details.component';
+import { AgentFormComponent } from './modules/agents/pages/agent-form.component';
+import { AgentListComponent } from './modules/agents/pages/agent-list.component';
 import { CustomerDashboardComponent } from './modules/customer/pages/dashboard.component';
 import { CustomerDetailsComponent } from './modules/customers/pages/customer-details.component';
 import { CustomerFormComponent } from './modules/customers/pages/customer-form.component';
@@ -64,11 +67,39 @@ const createStaffChildren = (roleLabel: string): Routes => [
       },
     ],
   },
-  createPlaceholderRoute(
-    'team',
-    `${roleLabel} team`,
-    'The team area is ready in the shell so staffing, coaching, and coordination features can drop in cleanly next.',
-  ),
+  {
+    path: 'agents',
+    children: [
+      {
+        path: '',
+        component: AgentListComponent,
+      },
+      {
+        path: 'invite',
+        component: AgentFormComponent,
+        data: { mode: 'invite' },
+      },
+      {
+        path: 'new',
+        component: AgentFormComponent,
+        data: { mode: 'create' },
+      },
+      {
+        path: ':id/edit',
+        component: AgentFormComponent,
+        data: { mode: 'edit' },
+      },
+      {
+        path: ':id',
+        component: AgentDetailsComponent,
+      },
+    ],
+  },
+  {
+    path: 'team',
+    pathMatch: 'full',
+    redirectTo: 'agents',
+  },
   createPlaceholderRoute(
     'reports',
     `${roleLabel} reports`,

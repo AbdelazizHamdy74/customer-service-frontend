@@ -26,14 +26,14 @@ const NAVIGATION_BY_ROLE: Record<string, NavigationItem[]> = {
   ADMIN: [
     { label: 'Dashboard', description: 'Operational snapshot', route: 'dashboard', exact: true },
     { label: 'Customers', description: 'Search and profiles', route: 'customers', badge: 'Live' },
-    { label: 'Team', description: 'Coverage and coaching', route: 'team', badge: 'Preview' },
+    { label: 'Agents', description: 'Invites and performance', route: 'agents', badge: 'Live' },
     { label: 'Reports', description: 'Service trends', route: 'reports', badge: 'Preview' },
     { label: 'Settings', description: 'Workspace controls', route: 'settings', badge: 'Preview' },
   ],
   SUPERVISOR: [
     { label: 'Dashboard', description: 'Queue and team view', route: 'dashboard', exact: true },
     { label: 'Customers', description: 'Search and assign', route: 'customers', badge: 'Live' },
-    { label: 'Team', description: 'Shift coordination', route: 'team', badge: 'Preview' },
+    { label: 'Agents', description: 'Coverage and coaching', route: 'agents', badge: 'Live' },
     { label: 'Reports', description: 'Performance trends', route: 'reports', badge: 'Preview' },
   ],
   AGENT: [
@@ -80,9 +80,9 @@ const NOTIFICATIONS_BY_ROLE: Record<string, NotificationItem[]> = {
       unread: true,
     },
     {
-      title: 'Reports placeholder published',
-      description: 'Navigation is in place so the next module can slot in cleanly.',
-      route: 'reports',
+      title: 'Agents workspace is live',
+      description: 'Invite, create, role assignment, and performance now sit in one staffing flow.',
+      route: 'agents',
       time: '18 min ago',
       unread: true,
     },
@@ -103,9 +103,10 @@ const NOTIFICATIONS_BY_ROLE: Record<string, NotificationItem[]> = {
       unread: true,
     },
     {
-      title: 'Team area remains navigable',
-      description: 'Placeholder routes keep your handoff and coordination path intact.',
-      route: 'team',
+      title: 'Agents flow is ready',
+      description:
+        'Search, invite, edit, and role assignment are now part of the staffing workspace.',
+      route: 'agents',
       time: '24 min ago',
       unread: true,
     },
@@ -538,6 +539,40 @@ export class MainLayoutComponent {
         eyebrow: 'Customers',
         title: 'Customer details',
         description: 'Review identity, address, and lifecycle data from a single place.',
+      };
+    }
+
+    if (url.includes('/agents/invite')) {
+      return {
+        eyebrow: 'Agents',
+        title: 'Invite agent',
+        description:
+          'Provision a teammate through the auth invite flow and keep staffing work moving.',
+      };
+    }
+
+    if (url.includes('/agents/new')) {
+      return {
+        eyebrow: 'Agents',
+        title: 'Create agent',
+        description: 'Create a direct agent record for staffing, seeding, or operations setup.',
+      };
+    }
+
+    if (/\/agents\/[^/]+\/edit(?:\?|$)/.test(url)) {
+      return {
+        eyebrow: 'Agents',
+        title: 'Edit agent',
+        description: 'Adjust role, team, and skills without losing the staffing context.',
+      };
+    }
+
+    if (/\/agents\/[^/?]+(?:\?|$)/.test(url)) {
+      return {
+        eyebrow: 'Agents',
+        title: 'Agent details',
+        description:
+          'Review profile, role assignment, and performance in a single staffing screen.',
       };
     }
 
