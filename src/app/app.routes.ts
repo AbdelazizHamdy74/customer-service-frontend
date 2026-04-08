@@ -17,6 +17,9 @@ import { CustomerDetailsComponent } from './modules/customers/pages/customer-det
 import { CustomerFormComponent } from './modules/customers/pages/customer-form.component';
 import { CustomerListComponent } from './modules/customers/pages/customer-list.component';
 import { WorkspaceDashboardComponent } from './modules/workspace/pages/dashboard.component';
+import { TicketDetailsComponent } from './modules/tickets/pages/ticket-details.component';
+import { TicketFormComponent } from './modules/tickets/pages/ticket-form.component';
+import { TicketListComponent } from './modules/tickets/pages/ticket-list.component';
 import { PlaceholderPageComponent } from './shared/pages/placeholder-page.component';
 
 const createPlaceholderRoute = (
@@ -64,6 +67,23 @@ const createStaffChildren = (roleLabel: string): Routes => [
       {
         path: ':id',
         component: CustomerDetailsComponent,
+      },
+    ],
+  },
+  {
+    path: 'tickets',
+    children: [
+      {
+        path: '',
+        component: TicketListComponent,
+      },
+      {
+        path: 'new',
+        component: TicketFormComponent,
+      },
+      {
+        path: ':id',
+        component: TicketDetailsComponent,
       },
     ],
   },
@@ -159,10 +179,12 @@ const agentChildren: Routes = [
   ),
 ];
 
+import { CustomerWelcomeComponent } from './modules/customer-welcome/customer-welcome.component';
+
 const customerChildren: Routes = [
   {
     path: '',
-    redirectTo: 'dashboard',
+    component: CustomerWelcomeComponent,
     pathMatch: 'full',
   },
   {

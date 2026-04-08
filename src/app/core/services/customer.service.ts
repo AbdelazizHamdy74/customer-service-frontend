@@ -221,6 +221,10 @@ export class CustomerService {
   }
 
   getCustomer(id: string): Observable<ApiResponse<Customer>> {
+    if (id.startsWith('mock-')) {
+      return this.getCustomerMock(id);
+    }
+
     return this.http.get<ApiResponse<RawCustomer>>(`${this.apiUrl}/${id}`).pipe(
       tap(() => this.usingMockSignal.set(false)),
       map((response) => ({
@@ -247,6 +251,10 @@ export class CustomerService {
   }
 
   updateCustomer(id: string, payload: CustomerUpsertPayload): Observable<ApiResponse<Customer>> {
+    if (id.startsWith('mock-')) {
+      return this.updateCustomerMock(id, payload);
+    }
+
     return this.http
       .put<ApiResponse<RawCustomer>>(`${this.apiUrl}/${id}`, this.toApiPayload(payload))
       .pipe(

@@ -26,6 +26,7 @@ const NAVIGATION_BY_ROLE: Record<string, NavigationItem[]> = {
   ADMIN: [
     { label: 'Dashboard', description: 'Operational snapshot', route: 'dashboard', exact: true },
     { label: 'Customers', description: 'Search and profiles', route: 'customers', badge: 'Live' },
+    { label: 'Tickets', description: 'Support ticket management', route: 'tickets', badge: 'Live' },
     { label: 'Agents', description: 'Invites and performance', route: 'agents', badge: 'Live' },
     { label: 'Reports', description: 'Service trends', route: 'reports', badge: 'Preview' },
     { label: 'Settings', description: 'Workspace controls', route: 'settings', badge: 'Preview' },
@@ -33,6 +34,7 @@ const NAVIGATION_BY_ROLE: Record<string, NavigationItem[]> = {
   SUPERVISOR: [
     { label: 'Dashboard', description: 'Queue and team view', route: 'dashboard', exact: true },
     { label: 'Customers', description: 'Search and assign', route: 'customers', badge: 'Live' },
+    { label: 'Tickets', description: 'Support ticket management', route: 'tickets', badge: 'Live' },
     { label: 'Agents', description: 'Coverage and coaching', route: 'agents', badge: 'Live' },
     { label: 'Reports', description: 'Performance trends', route: 'reports', badge: 'Preview' },
   ],
@@ -44,7 +46,7 @@ const NAVIGATION_BY_ROLE: Record<string, NavigationItem[]> = {
       route: 'customers',
       badge: 'Live',
     },
-    { label: 'Tickets', description: 'Issue queue', route: 'tickets', badge: 'Preview' },
+    { label: 'Tickets', description: 'Issue queue', route: 'tickets', badge: 'Live' },
     {
       label: 'Knowledge Base',
       description: 'Guides and playbooks',
