@@ -37,9 +37,15 @@ export interface Ticket {
 export interface TicketUpsertPayload {
   subject: string;
   description: string;
-  customerId: string;
+  /** Set automatically for customer users by the API when omitted. */
+  customerId?: string;
   assignedAgentId?: string | null;
   status?: TicketStatus;
+}
+
+export interface TicketAssignPayload {
+  assignedAgentId: string;
+  note?: string;
 }
 
 export interface TicketSearchParams {

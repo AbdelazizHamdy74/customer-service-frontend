@@ -2,8 +2,9 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { filter } from 'rxjs';
+import { filter, interval, startWith } from 'rxjs';
 import { AuthService } from '../core/services/auth.service';
+import { AppNotification, NotificationService } from '../core/services/notification.service';
 import { getRoleBasePath } from '../core/utils/role-path.util';
 
 interface NavigationItem {
@@ -60,7 +61,7 @@ const NAVIGATION_BY_ROLE: Record<string, NavigationItem[]> = {
       label: 'My Requests',
       description: 'Track open help items',
       route: 'requests',
-      badge: 'Preview',
+      badge: 'Live',
     },
     { label: 'Profile', description: 'Account preferences', route: 'profile', badge: 'Preview' },
     {
@@ -409,6 +410,9 @@ const NOTIFICATIONS_BY_ROLE: Record<string, NotificationItem[]> = {
 export class MainLayoutComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly notificationService = inject(NotificationService);
+  private readonly liveNotificationsSignal = signal<NotificationItem[] | null>(null);
+  private readonly unreadFromApi = signal(0);
   readonly sidebarOpen = signal(false);
   readonly notificationsOpen = signal(false);
   readonly userMenuOpen = signal(false);
@@ -426,12 +430,19 @@ export class MainLayoutComponent {
   );
   readonly basePath = computed(() => getRoleBasePath(this.role()));
   readonly navigationItems = computed(() => this.buildNavigationItems());
-  readonly notifications = computed(
-    () => NOTIFICATIONS_BY_ROLE[this.role()] ?? NOTIFICATIONS_BY_ROLE['ADMIN'],
-  );
-  readonly notificationCount = computed(
-    () => this.notifications().filter((item) => item.unread).length,
-  );
+  readonly notifications = computed(() => {
+    const live = this.liveNotificationsSignal();
+    if (live !== null) {
+      return live;
+    }
+    return NOTIFICATIONS_BY_ROLE[this.role()] ?? NOTIFICATIONS_BY_ROLE['ADMIN'];
+  });
+  readonly notificationCount = computed(() => {
+    if (this.liveNotificationsSignal() !== null) {
+      return this.unreadFromApi();
+    }
+    return this.notifications().filter((item) => item.unread).length;
+  });
   readonly userInitials = computed(() => {
     const name = this.user()?.name?.trim();
     if (!name) {
@@ -447,6 +458,12 @@ export class MainLayoutComponent {
   readonly pageMeta = computed(() => this.resolvePageMeta(this.currentUrl()));
 
   constructor() {
+    this.refreshNotifications();
+
+    interval(90_000)
+      .pipe(startWith(0), takeUntilDestroyed())
+      .subscribe(() => this.refreshNotifications());
+
     this.router.events
       .pipe(
         filter((event): event is NavigationEnd => event instanceof NavigationEnd),
@@ -465,7 +482,11 @@ export class MainLayoutComponent {
   }
 
   toggleNotifications(): void {
-    this.notificationsOpen.update((open) => !open);
+    const willOpen = !this.notificationsOpen();
+    this.notificationsOpen.set(willOpen);
+    if (willOpen) {
+      this.refreshNotifications();
+    }
     this.userMenuOpen.set(false);
   }
 
@@ -513,6 +534,43 @@ export class MainLayoutComponent {
       ...item,
       path: `${basePath}/${item.route}`,
     }));
+  }
+
+  private refreshNotifications(): void {
+    this.notificationService.list({ page: 1, limit: 12 }).subscribe({
+      next: ({ items, unreadCount }) => {
+        this.unreadFromApi.set(unreadCount);
+        this.liveNotificationsSignal.set(
+          items.map((n) => ({
+            title: n.title,
+            description: n.message,
+            route: this.mapNotificationRoute(n),
+            time: this.formatNotificationTime(n.happenedAt),
+            unread: !n.isRead,
+          })),
+        );
+      },
+      error: () => {
+        this.unreadFromApi.set(0);
+        this.liveNotificationsSignal.set(null);
+      },
+    });
+  }
+
+  private mapNotificationRoute(n: AppNotification): string {
+    const entityType = (n.entityType || '').toUpperCase();
+    if (entityType === 'TICKET' && n.entityId) {
+      return `tickets/${n.entityId}`;
+    }
+    return 'dashboard';
+  }
+
+  private formatNotificationTime(iso: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) {
+      return '';
+    }
+    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
   }
 
   private resolvePageMeta(url: string): {

@@ -5,6 +5,7 @@ import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api.model';
 import {
   Ticket,
+  TicketAssignPayload,
   TicketComment,
   TicketHistory,
   TicketPagination,
@@ -261,6 +262,12 @@ export class TicketService {
   update(id: string, payload: Partial<TicketUpsertPayload>): Observable<Ticket> {
     return this.http
       .put<ApiResponse<RawTicket>>(`${this.apiUrl}/${id}`, payload)
+      .pipe(map((response) => this.transformTicket(response.data || {})));
+  }
+
+  assign(id: string, payload: TicketAssignPayload): Observable<Ticket> {
+    return this.http
+      .put<ApiResponse<RawTicket>>(`${this.apiUrl}/${id}/assign`, payload)
       .pipe(map((response) => this.transformTicket(response.data || {})));
   }
 

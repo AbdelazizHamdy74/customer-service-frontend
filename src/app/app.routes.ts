@@ -13,6 +13,7 @@ import { AgentDetailsComponent } from './modules/agents/pages/agent-details.comp
 import { AgentFormComponent } from './modules/agents/pages/agent-form.component';
 import { AgentListComponent } from './modules/agents/pages/agent-list.component';
 import { CustomerDashboardComponent } from './modules/customer/pages/dashboard.component';
+import { CustomerRequestsComponent } from './modules/customer/pages/customer-requests.component';
 import { CustomerDetailsComponent } from './modules/customers/pages/customer-details.component';
 import { CustomerFormComponent } from './modules/customers/pages/customer-form.component';
 import { CustomerListComponent } from './modules/customers/pages/customer-list.component';
@@ -167,11 +168,19 @@ const agentChildren: Routes = [
       },
     ],
   },
-  createPlaceholderRoute(
-    'tickets',
-    'Agent tickets',
-    'Ticket navigation is available today so the workspace still feels complete while that module is implemented next.',
-  ),
+  {
+    path: 'tickets',
+    children: [
+      {
+        path: '',
+        component: TicketListComponent,
+      },
+      {
+        path: ':id',
+        component: TicketDetailsComponent,
+      },
+    ],
+  },
   createPlaceholderRoute(
     'knowledge-base',
     'Knowledge base',
@@ -191,13 +200,19 @@ const customerChildren: Routes = [
     path: 'dashboard',
     component: CustomerDashboardComponent,
   },
-  createPlaceholderRoute(
-    'requests',
-    'My requests',
-    'This route is ready for support request history, follow-ups, and status tracking as the customer-facing modules expand.',
-    'dashboard',
-    'Open dashboard',
-  ),
+  {
+    path: 'requests',
+    component: CustomerRequestsComponent,
+  },
+  {
+    path: 'tickets',
+    children: [
+      {
+        path: ':id',
+        component: TicketDetailsComponent,
+      },
+    ],
+  },
   createPlaceholderRoute(
     'profile',
     'My profile',

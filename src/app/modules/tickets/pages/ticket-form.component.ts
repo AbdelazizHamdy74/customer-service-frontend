@@ -4,6 +4,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { TicketUpsertPayload } from '../../../core/models/ticket.model';
 import { TicketService } from '../../../core/services/ticket.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { getRoleBasePath } from '../../../core/utils/role-path.util';
 
 @Component({
   selector: 'app-ticket-form',
@@ -82,6 +84,7 @@ export class TicketFormComponent {
   private readonly ticketService = inject(TicketService);
   private readonly formBuilder = inject(FormBuilder);
   private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
 
   readonly ticketForm = this.formBuilder.group({
     subject: ['', [Validators.required, Validators.minLength(3)]],
@@ -101,7 +104,7 @@ export class TicketFormComponent {
       };
       this.ticketService.create(payload).subscribe({
         next: () => {
-          this.router.navigate(['/tickets']);
+          this.router.navigate([`${getRoleBasePath(this.auth.user$()?.role)}/tickets`]);
         },
         error: (error) => {
           console.error('Error creating ticket:', error);
@@ -111,6 +114,6 @@ export class TicketFormComponent {
   }
 
   onCancel(): void {
-    this.router.navigate(['/tickets']);
+    this.router.navigate([`${getRoleBasePath(this.auth.user$()?.role)}/tickets`]);
   }
 }

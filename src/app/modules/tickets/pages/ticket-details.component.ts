@@ -1,13 +1,19 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Ticket } from '../../../core/models/ticket.model';
+import { UserRole } from '../../../core/models/auth.model';
+import { AgentService } from '../../../core/services/agent.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { TicketService } from '../../../core/services/ticket.service';
+import { Agent } from '../../../core/models/agent.model';
+import { getRoleBasePath } from '../../../core/utils/role-path.util';
 
 @Component({
   selector: 'app-ticket-details',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ReactiveFormsModule],
   template: `
     <section class="space-y-6">
       <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -62,6 +68,55 @@ import { TicketService } from '../../../core/services/ticket.service';
           </div>
         </div>
 
+        <div
+          *ngIf="canAssign()"
+          class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm"
+        >
+          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-500">
+            Assignment
+          </p>
+          <h3 class="mt-2 text-lg font-semibold text-slate-950">Assign to an agent</h3>
+          <p class="mt-1 text-sm text-slate-600">
+            Choose an active agent so they can pick up the ticket. They will receive an email and an
+            in-app notification.
+          </p>
+
+          <form [formGroup]="assignForm" (ngSubmit)="submitAssign()" class="mt-6 space-y-4">
+            <div class="grid gap-4 md:grid-cols-2">
+              <label class="space-y-2">
+                <span class="text-sm font-medium text-slate-700">Agent *</span>
+                <select
+                  formControlName="assignedAgentId"
+                  class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:bg-white"
+                >
+                  <option value="">Select…</option>
+                  <option *ngFor="let a of agents()" [value]="a.id">
+                    {{ agentLabel(a) }}
+                  </option>
+                </select>
+              </label>
+              <label class="space-y-2">
+                <span class="text-sm font-medium text-slate-700">Note (optional)</span>
+                <input
+                  formControlName="note"
+                  type="text"
+                  placeholder="Optional note for history"
+                  class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:bg-white"
+                />
+              </label>
+            </div>
+            <p *ngIf="assignError()" class="text-sm text-red-600">{{ assignError() }}</p>
+            <p *ngIf="assignSuccess()" class="text-sm text-emerald-700">{{ assignSuccess() }}</p>
+            <button
+              type="submit"
+              [disabled]="ticket()!.status === 'CLOSED' || assignForm.invalid || assignSubmitting()"
+              class="inline-flex items-center rounded-full bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+            >
+              {{ assignSubmitting() ? 'Assigning…' : 'Assign ticket' }}
+            </button>
+          </form>
+        </div>
+
         <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
           <h3 class="text-lg font-semibold text-slate-950 mb-4">Comments</h3>
           <div class="space-y-4">
@@ -91,24 +146,96 @@ export class TicketDetailsComponent {
   private readonly ticketService = inject(TicketService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
+  private readonly agentService = inject(AgentService);
+  private readonly fb = inject(FormBuilder);
 
   readonly ticket = signal<Ticket | null>(null);
+  readonly agents = signal<Agent[]>([]);
+  readonly assignSubmitting = signal(false);
+  readonly assignError = signal<string | null>(null);
+  readonly assignSuccess = signal<string | null>(null);
+
+  readonly canAssign = computed(() => {
+    const role = this.auth.user$()?.role;
+    return role === UserRole.ADMIN || role === UserRole.SUPERVISOR;
+  });
+
+  readonly assignForm = this.fb.group({
+    assignedAgentId: ['', Validators.required],
+    note: [''],
+  });
 
   constructor() {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
-      this.ticketService.getById(id).subscribe({
-        next: (ticket) => this.ticket.set(ticket),
-        error: (error) => {
-          console.error('Error loading ticket:', error);
-          this.router.navigate(['/tickets']);
+      this.loadTicket(id);
+    }
+
+    const role = this.auth.user$()?.role;
+    if (role === UserRole.ADMIN || role === UserRole.SUPERVISOR) {
+      this.agentService.searchAgents({ status: 'ACTIVE', limit: 100, page: 1 }).subscribe({
+        next: (res) => {
+          if (res.data?.items) {
+            this.agents.set(res.data.items);
+          }
+        },
+        error: () => {
+          /* agents optional for view */
         },
       });
     }
   }
 
+  private loadTicket(id: string): void {
+    this.ticketService.getById(id).subscribe({
+      next: (t) => {
+        this.ticket.set(t);
+        if (t.assignedAgentId) {
+          this.assignForm.patchValue({ assignedAgentId: t.assignedAgentId });
+        }
+      },
+      error: (error) => {
+        console.error('Error loading ticket:', error);
+        this.router.navigate([`${getRoleBasePath(this.auth.user$()?.role)}/tickets`]);
+      },
+    });
+  }
+
+  submitAssign(): void {
+    const id = this.ticket()?.id;
+    if (!id || this.assignForm.invalid) return;
+
+    this.assignSubmitting.set(true);
+    this.assignError.set(null);
+    this.assignSuccess.set(null);
+
+    const raw = this.assignForm.getRawValue();
+    this.ticketService
+      .assign(id, {
+        assignedAgentId: raw.assignedAgentId!,
+        note: raw.note?.trim() || undefined,
+      })
+      .subscribe({
+        next: (ticket) => {
+          this.ticket.set(ticket);
+          this.assignSubmitting.set(false);
+          this.assignSuccess.set('Ticket assigned successfully.');
+        },
+        error: (err) => {
+          this.assignSubmitting.set(false);
+          this.assignError.set(err?.error?.message || 'Failed to assign ticket.');
+        },
+      });
+  }
+
   goBack(): void {
-    this.router.navigate(['/tickets']);
+    this.router.navigate([`${getRoleBasePath(this.auth.user$()?.role)}/tickets`]);
+  }
+
+  agentLabel(agent: Agent): string {
+    const name = [agent.firstName, agent.lastName].filter(Boolean).join(' ').trim();
+    return name ? `${name} (${agent.id})` : agent.id;
   }
 
   getStatusBadgeClasses(status: string): string {
