@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { TicketUpsertPayload } from '../../../core/models/ticket.model';
+import { TicketPriority, TicketUpsertPayload } from '../../../core/models/ticket.model';
 import { TicketService } from '../../../core/services/ticket.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { getRoleBasePath } from '../../../core/utils/role-path.util';
@@ -29,6 +29,18 @@ import { getRoleBasePath } from '../../../core/utils/role-path.util';
         <form [formGroup]="ticketForm" (ngSubmit)="onSubmit()" class="space-y-6">
           <div class="grid gap-4 md:grid-cols-2">
             <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Priority</span>
+              <select
+                formControlName="priority"
+                class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:bg-white"
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="CRITICAL">Critical</option>
+              </select>
+            </label>
+            <label class="space-y-2">
               <span class="text-sm font-medium text-slate-700">Subject *</span>
               <input
                 formControlName="subject"
@@ -38,7 +50,7 @@ import { getRoleBasePath } from '../../../core/utils/role-path.util';
               />
             </label>
 
-            <label class="space-y-2">
+            <label class="space-y-2 md:col-span-2">
               <span class="text-sm font-medium text-slate-700">Customer ID *</span>
               <input
                 formControlName="customerId"
@@ -87,6 +99,7 @@ export class TicketFormComponent {
   private readonly auth = inject(AuthService);
 
   readonly ticketForm = this.formBuilder.group({
+    priority: ['MEDIUM' as TicketPriority],
     subject: ['', [Validators.required, Validators.minLength(3)]],
     description: ['', [Validators.required, Validators.minLength(10)]],
     customerId: ['', Validators.required],
@@ -101,6 +114,7 @@ export class TicketFormComponent {
         subject: value.subject!,
         description: value.description!,
         customerId: value.customerId!,
+        priority: (value.priority || 'MEDIUM') as TicketPriority,
       };
       this.ticketService.create(payload).subscribe({
         next: () => {

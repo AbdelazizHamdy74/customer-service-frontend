@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Ticket } from '../../../core/models/ticket.model';
+import { CannedResponseItem, Ticket, TicketPriority } from '../../../core/models/ticket.model';
 import { UserRole } from '../../../core/models/auth.model';
 import { AgentService } from '../../../core/services/agent.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -49,7 +49,7 @@ import { getRoleBasePath } from '../../../core/utils/role-path.util';
               </span>
             </div>
             <p class="text-slate-600">{{ ticket()!.description }}</p>
-            <div class="grid gap-4 md:grid-cols-3">
+            <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div>
                 <span class="text-sm font-medium text-slate-700">Customer ID:</span>
                 <p class="text-sm text-slate-900">{{ ticket()!.customerId }}</p>
@@ -61,11 +61,59 @@ import { getRoleBasePath } from '../../../core/utils/role-path.util';
                 </p>
               </div>
               <div>
+                <span class="text-sm font-medium text-slate-700">Priority:</span>
+                <p class="text-sm text-slate-900">{{ ticket()!.priority || 'MEDIUM' }}</p>
+              </div>
+              <div>
+                <span class="text-sm font-medium text-slate-700">SLA due:</span>
+                <p class="text-sm text-slate-900">
+                  {{ formatDate(ticket()!.slaDueAt) }}
+                  <span
+                    *ngIf="isSlaOverdue(ticket()!)"
+                    class="ml-2 inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800"
+                    >Overdue</span
+                  >
+                </p>
+              </div>
+              <div>
                 <span class="text-sm font-medium text-slate-700">Created:</span>
                 <p class="text-sm text-slate-900">{{ formatDate(ticket()!.createdAt) }}</p>
               </div>
             </div>
           </div>
+        </div>
+
+        <div
+          *ngIf="canEditPriority() && ticket()!.status !== 'CLOSED'"
+          class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm"
+        >
+          <h3 class="text-lg font-semibold text-slate-950">Priority (staff)</h3>
+          <p class="mt-1 text-sm text-slate-600">
+            Changing priority recalculates SLA from the original creation time.
+          </p>
+          <form [formGroup]="priorityForm" (ngSubmit)="submitPriority()" class="mt-4 flex flex-wrap items-end gap-4">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Priority</span>
+              <select
+                formControlName="priority"
+                class="w-full min-w-[12rem] rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:bg-white"
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="CRITICAL">Critical</option>
+              </select>
+            </label>
+            <button
+              type="submit"
+              [disabled]="prioritySubmitting() || priorityForm.pristine"
+              class="inline-flex items-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+            >
+              {{ prioritySubmitting() ? 'Saving…' : 'Update priority' }}
+            </button>
+            <p *ngIf="priorityMessage()" class="text-sm text-emerald-700">{{ priorityMessage() }}</p>
+            <p *ngIf="priorityError()" class="text-sm text-red-600">{{ priorityError() }}</p>
+          </form>
         </div>
 
         <div
@@ -119,6 +167,38 @@ import { getRoleBasePath } from '../../../core/utils/role-path.util';
 
         <div class="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
           <h3 class="text-lg font-semibold text-slate-950 mb-4">Comments</h3>
+
+          <div *ngIf="cannedList().length > 0" class="mb-4 flex flex-wrap items-center gap-2">
+            <span class="text-sm text-slate-600">Canned response:</span>
+            <select
+              class="rounded-2xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900"
+              (change)="onCannedPick($event)"
+            >
+              <option value="">Insert…</option>
+              <option *ngFor="let c of cannedList(); let i = index" [value]="i">{{ c.title }}</option>
+            </select>
+          </div>
+
+          <form [formGroup]="commentForm" (ngSubmit)="submitComment()" class="mb-6 space-y-3">
+            <label class="space-y-2 block">
+              <span class="text-sm font-medium text-slate-700">New comment</span>
+              <textarea
+                formControlName="message"
+                rows="3"
+                placeholder="Reply to the customer or internal note"
+                class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:bg-white"
+              ></textarea>
+            </label>
+            <button
+              type="submit"
+              [disabled]="ticket()!.status === 'CLOSED' || commentForm.invalid || commentSubmitting()"
+              class="inline-flex items-center rounded-full bg-indigo-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
+            >
+              {{ commentSubmitting() ? 'Sending…' : 'Add comment' }}
+            </button>
+            <p *ngIf="commentError()" class="text-sm text-red-600">{{ commentError() }}</p>
+          </form>
+
           <div class="space-y-4">
             <div
               *ngFor="let comment of ticket()!.comments"
@@ -155,15 +235,34 @@ export class TicketDetailsComponent {
   readonly assignSubmitting = signal(false);
   readonly assignError = signal<string | null>(null);
   readonly assignSuccess = signal<string | null>(null);
+  readonly cannedList = signal<CannedResponseItem[]>([]);
+  readonly commentSubmitting = signal(false);
+  readonly commentError = signal<string | null>(null);
+  readonly prioritySubmitting = signal(false);
+  readonly priorityMessage = signal<string | null>(null);
+  readonly priorityError = signal<string | null>(null);
 
   readonly canAssign = computed(() => {
     const role = this.auth.user$()?.role;
     return role === UserRole.ADMIN || role === UserRole.SUPERVISOR;
   });
 
+  readonly canEditPriority = computed(() => {
+    const role = this.auth.user$()?.role;
+    return role === UserRole.ADMIN || role === UserRole.SUPERVISOR || role === UserRole.AGENT;
+  });
+
   readonly assignForm = this.fb.group({
     assignedAgentId: ['', Validators.required],
     note: [''],
+  });
+
+  readonly commentForm = this.fb.group({
+    message: ['', [Validators.required, Validators.minLength(1)]],
+  });
+
+  readonly priorityForm = this.fb.group({
+    priority: ['MEDIUM' as TicketPriority],
   });
 
   constructor() {
@@ -185,6 +284,30 @@ export class TicketDetailsComponent {
         },
       });
     }
+
+    if (
+      role === UserRole.ADMIN ||
+      role === UserRole.SUPERVISOR ||
+      role === UserRole.AGENT
+    ) {
+      this.ticketService.listCannedResponses().subscribe({
+        next: (list) => this.cannedList.set(list),
+        error: () => this.cannedList.set([]),
+      });
+    }
+  }
+
+  onCannedPick(ev: Event): void {
+    const sel = ev.target as HTMLSelectElement;
+    const raw = sel.value;
+    sel.selectedIndex = 0;
+    if (raw === '') return;
+    const idx = Number(raw);
+    const list = this.cannedList();
+    const item = Number.isInteger(idx) ? list[idx] : undefined;
+    if (item) {
+      this.applyCanned(item.body);
+    }
   }
 
   private loadTicket(id: string): void {
@@ -194,6 +317,8 @@ export class TicketDetailsComponent {
         if (t.assignedAgentId) {
           this.assignForm.patchValue({ assignedAgentId: t.assignedAgentId });
         }
+        this.priorityForm.patchValue({ priority: (t.priority || 'MEDIUM') as TicketPriority });
+        this.priorityForm.markAsPristine();
       },
       error: (error) => {
         console.error('Error loading ticket:', error);
@@ -231,6 +356,62 @@ export class TicketDetailsComponent {
 
   goBack(): void {
     this.router.navigate([`${getRoleBasePath(this.auth.user$()?.role)}/tickets`]);
+  }
+
+  submitComment(): void {
+    const id = this.ticket()?.id;
+    const msg = this.commentForm.get('message')?.value?.trim();
+    if (!id || !msg) return;
+
+    this.commentSubmitting.set(true);
+    this.commentError.set(null);
+    this.ticketService.addComment(id, msg).subscribe({
+      next: () => {
+        this.commentForm.reset();
+        this.commentSubmitting.set(false);
+        this.loadTicket(id);
+      },
+      error: (err) => {
+        this.commentSubmitting.set(false);
+        this.commentError.set(err?.error?.message || 'Could not add comment.');
+      },
+    });
+  }
+
+  applyCanned(body: string): void {
+    if (!body) return;
+    const cur = this.commentForm.get('message')?.value || '';
+    const next = cur ? `${cur.trim()}\n\n${body}` : body;
+    this.commentForm.patchValue({ message: next });
+  }
+
+  submitPriority(): void {
+    const id = this.ticket()?.id;
+    const p = this.priorityForm.get('priority')?.value as TicketPriority;
+    if (!id || !p) return;
+
+    this.prioritySubmitting.set(true);
+    this.priorityMessage.set(null);
+    this.priorityError.set(null);
+    this.ticketService.update(id, { priority: p }).subscribe({
+      next: (t) => {
+        this.ticket.set(t);
+        this.prioritySubmitting.set(false);
+        this.priorityMessage.set('Priority updated.');
+        this.priorityForm.markAsPristine();
+      },
+      error: (err) => {
+        this.prioritySubmitting.set(false);
+        this.priorityError.set(err?.error?.message || 'Update failed.');
+      },
+    });
+  }
+
+  isSlaOverdue(ticket: Ticket): boolean {
+    if (!ticket.slaDueAt || ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
+      return false;
+    }
+    return new Date(ticket.slaDueAt).getTime() < Date.now();
   }
 
   agentLabel(agent: Agent): string {
@@ -272,7 +453,8 @@ export class TicketDetailsComponent {
     }
   }
 
-  formatDate(dateString: string): string {
+  formatDate(dateString: string | null | undefined): string {
+    if (!dateString) return '—';
     return new Date(dateString).toLocaleString();
   }
 }

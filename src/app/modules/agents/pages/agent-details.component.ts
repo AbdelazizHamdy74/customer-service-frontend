@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, finalize, map, of, switchMap, tap } from 'rxjs';
 import {
   Agent,
@@ -12,6 +12,7 @@ import {
 } from '../../../core/models/agent.model';
 import { AgentService } from '../../../core/services/agent.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { UserRole } from '../../../core/models/auth.model';
 import { getRoleBasePath } from '../../../core/utils/role-path.util';
 
 @Component({
@@ -52,6 +53,15 @@ import { getRoleBasePath } from '../../../core/utils/role-path.util';
           >
             Edit agent
           </a>
+          <button
+            *ngIf="canDeleteAgent() && agent()"
+            type="button"
+            (click)="confirmDelete()"
+            [disabled]="isDeleting()"
+            class="inline-flex items-center rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {{ isDeleting() ? 'Deleting…' : 'Delete agent' }}
+          </button>
         </div>
       </div>
 
@@ -67,6 +77,13 @@ import { getRoleBasePath } from '../../../core/utils/role-path.util';
         class="rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700"
       >
         {{ error() }}
+      </div>
+
+      <div
+        *ngIf="deleteError()"
+        class="rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700"
+      >
+        {{ deleteError() }}
       </div>
 
       <div *ngIf="isLoading()" class="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -382,6 +399,7 @@ import { getRoleBasePath } from '../../../core/utils/role-path.util';
 })
 export class AgentDetailsComponent {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly formBuilder = inject(FormBuilder);
   private readonly authService = inject(AuthService);
   private readonly agentService = inject(AgentService);
@@ -398,9 +416,15 @@ export class AgentDetailsComponent {
   readonly error = signal<string | null>(null);
   readonly performanceError = signal<string | null>(null);
   readonly assignRoleError = signal<string | null>(null);
+  readonly isDeleting = signal(false);
+  readonly deleteError = signal<string | null>(null);
   readonly selectedWindowDays = signal(30);
   readonly usingMock = this.agentService.usingMock$;
   readonly user = this.authService.user$;
+  readonly canDeleteAgent = computed(() => {
+    const role = this.user()?.role;
+    return role === UserRole.ADMIN || role === UserRole.SUPERVISOR;
+  });
   readonly basePath = computed(() => getRoleBasePath(this.user()?.role));
   readonly agentsPath = computed(() => `${this.basePath()}/agents`);
   readonly editPath = computed(() => {
@@ -467,6 +491,38 @@ export class AgentDetailsComponent {
     if (agentId) {
       this.loadPerformance(agentId);
     }
+  }
+
+  confirmDelete(): void {
+    const current = this.agent();
+    if (!current || this.isDeleting()) {
+      return;
+    }
+
+    const ok = window.confirm(
+      `Delete ${current.fullName}? This removes the agent profile. Linked auth accounts are not deleted automatically.`,
+    );
+    if (!ok) {
+      return;
+    }
+
+    this.isDeleting.set(true);
+    this.deleteError.set(null);
+
+    this.agentService
+      .deleteAgent(current.id)
+      .pipe(
+        catchError((error) => {
+          this.deleteError.set(this.getErrorMessage(error, 'Unable to delete this agent.'));
+          return of(null);
+        }),
+        finalize(() => this.isDeleting.set(false)),
+      )
+      .subscribe((response) => {
+        if (response?.success) {
+          this.router.navigateByUrl(this.agentsPath());
+        }
+      });
   }
 
   assignRole(): void {

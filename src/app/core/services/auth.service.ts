@@ -1,6 +1,6 @@
 import { Injectable, signal, effect } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 import { tap, catchError, map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { StorageService } from './storage.service';
@@ -130,13 +130,16 @@ export class AuthService {
    */
   logout(): Observable<any> {
     const refreshToken = this.refreshTokenSignal();
+    if (!refreshToken) {
+      this.clearAuthData();
+      return of(undefined);
+    }
 
     return this.http.post(`${this.API_URL}/logout`, { refreshToken }).pipe(
       tap(() => {
         this.clearAuthData();
       }),
       catchError((error) => {
-        // Clear auth data even if logout request fails
         this.clearAuthData();
         return throwError(() => error);
       }),

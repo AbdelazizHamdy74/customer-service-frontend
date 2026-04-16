@@ -320,6 +320,15 @@ export class AgentService {
       ) as Observable<ApiResponse<Agent>>;
   }
 
+  deleteAgent(id: string): Observable<ApiResponse<void>> {
+    return this.http.delete<ApiResponse<void>>(`${this.apiUrl}/${id}`).pipe(
+      tap(() => this.usingMockSignal.set(false)),
+      catchError((error) =>
+        this.shouldUseMock(error) ? this.deleteAgentMock(id) : throwError(() => error),
+      ),
+    );
+  }
+
   assignRole(id: string, role: AgentRole): Observable<ApiResponse<Agent>> {
     return this.http.put<ApiResponse<RawAgent>>(`${this.apiUrl}/${id}/role`, { role }).pipe(
       tap(() => this.usingMockSignal.set(false)),
@@ -518,6 +527,7 @@ export class AgentService {
         userId,
         inviteToken,
         inviteTokenExpiresAt: expiresAt,
+        defaultLoginPassword: 'password123',
       },
     }).pipe(
       delay(240),
@@ -558,6 +568,29 @@ export class AgentService {
       data: updated,
     }).pipe(
       delay(180),
+      tap(() => this.usingMockSignal.set(true)),
+    );
+  }
+
+  private deleteAgentMock(id: string): Observable<ApiResponse<void>> {
+    const existing = this.mockAgentsSignal().find((entry) => entry.id === id);
+    if (!existing) {
+      return throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 404,
+            error: { message: 'Agent not found' },
+          }),
+      );
+    }
+
+    this.mockAgentsSignal.update((agents) => agents.filter((a) => a.id !== id));
+
+    return of({
+      success: true,
+      message: 'Agent deleted in mock workspace',
+    }).pipe(
+      delay(160),
       tap(() => this.usingMockSignal.set(true)),
     );
   }
@@ -854,6 +887,7 @@ export class AgentService {
       userId: raw?.userId ?? '',
       inviteToken: raw?.inviteToken ?? '',
       inviteTokenExpiresAt: raw?.inviteTokenExpiresAt ?? new Date().toISOString(),
+      defaultLoginPassword: raw?.defaultLoginPassword,
     };
   }
 

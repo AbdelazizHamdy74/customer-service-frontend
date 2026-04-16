@@ -80,9 +80,9 @@ import { TicketService } from '../../../core/services/ticket.service';
           id="ticket-search-form"
           [formGroup]="searchForm"
           (ngSubmit)="applyFilters()"
-          class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5"
+          class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
         >
-          <label class="space-y-2 xl:col-span-2">
+          <label class="space-y-2 md:col-span-2">
             <span class="text-sm font-medium text-slate-700">Global search</span>
             <input
               formControlName="q"
@@ -126,6 +126,31 @@ import { TicketService } from '../../../core/services/ticket.service';
               class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:bg-white"
             />
           </label>
+
+          <label class="space-y-2">
+            <span class="text-sm font-medium text-slate-700">Priority</span>
+            <select
+              formControlName="priority"
+              class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:bg-white"
+            >
+              <option value="">All</option>
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+              <option value="CRITICAL">Critical</option>
+            </select>
+          </label>
+
+          <label class="space-y-2">
+            <span class="text-sm font-medium text-slate-700">SLA</span>
+            <select
+              formControlName="overdue"
+              class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:bg-white"
+            >
+              <option value="">Any</option>
+              <option value="true">Overdue only</option>
+            </select>
+          </label>
         </form>
       </div>
 
@@ -144,7 +169,9 @@ import { TicketService } from '../../../core/services/ticket.service';
                 <tr class="border-b border-slate-200">
                   <th class="px-4 py-3 text-left text-sm font-semibold text-slate-950">Subject</th>
                   <th class="px-4 py-3 text-left text-sm font-semibold text-slate-950">Customer</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-slate-950">Priority</th>
                   <th class="px-4 py-3 text-left text-sm font-semibold text-slate-950">Status</th>
+                  <th class="px-4 py-3 text-left text-sm font-semibold text-slate-950">SLA due</th>
                   <th class="px-4 py-3 text-left text-sm font-semibold text-slate-950">
                     Assigned Agent
                   </th>
@@ -165,11 +192,30 @@ import { TicketService } from '../../../core/services/ticket.service';
                   </td>
                   <td class="px-4 py-4">
                     <span
+                      class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-slate-100 text-slate-800"
+                    >
+                      {{ ticket.priority || 'MEDIUM' }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-4">
+                    <span
                       class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
                       [ngClass]="getStatusBadgeClasses(ticket.status)"
                     >
                       {{ getStatusLabel(ticket.status) }}
                     </span>
+                  </td>
+                  <td class="px-4 py-4">
+                    <div class="flex flex-col gap-1">
+                      <span class="text-sm text-slate-700">{{
+                        ticket.slaDueAt ? formatDateTime(ticket.slaDueAt) : '—'
+                      }}</span>
+                      <span
+                        *ngIf="isSlaOverdue(ticket)"
+                        class="inline-flex w-fit rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800"
+                        >Overdue</span
+                      >
+                    </div>
                   </td>
                   <td class="px-4 py-4">
                     <span class="text-sm text-slate-700">{{
@@ -241,6 +287,8 @@ export class TicketListComponent {
     customerId: [''],
     assignedAgentId: [''],
     status: [''],
+    priority: [''],
+    overdue: [''],
   });
 
   readonly tickets = signal<Ticket[]>([]);
@@ -251,6 +299,21 @@ export class TicketListComponent {
   readonly loading = signal(false);
 
   constructor() {
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((p) => {
+      this.searchForm.patchValue(
+        {
+          q: p.get('q') || '',
+          subject: p.get('subject') || '',
+          customerId: p.get('customerId') || '',
+          assignedAgentId: p.get('assignedAgentId') || '',
+          status: p.get('status') || '',
+          priority: p.get('priority') || '',
+          overdue: p.get('overdue') === 'true' ? 'true' : '',
+        },
+        { emitEvent: false },
+      );
+    });
+
     this.route.queryParamMap
       .pipe(
         takeUntilDestroyed(),
@@ -274,24 +337,34 @@ export class TicketListComponent {
   }
 
   applyFilters(): void {
-    const params = this.searchForm.value as TicketSearchParams;
-    params.page = 1; // Reset to first page when applying filters
-
-    this.updateQueryParams(params);
+    this.updateQueryParams({ ...this.formToSearchParams(), page: 1 });
   }
 
   clearFilters(): void {
     this.searchForm.reset();
-    this.updateQueryParams({});
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {},
+    });
   }
 
   goToPage(page: number): void {
     if (page < 1 || page > this.totalPages()) return;
 
-    const params = this.searchForm.value as TicketSearchParams;
-    params.page = page;
+    this.updateQueryParams({ ...this.formToSearchParams(), page });
+  }
 
-    this.updateQueryParams(params);
+  private formToSearchParams(): Omit<TicketSearchParams, 'page' | 'limit'> {
+    const raw = this.searchForm.getRawValue();
+    return {
+      q: raw.q?.trim() || undefined,
+      subject: raw.subject?.trim() || undefined,
+      customerId: raw.customerId?.trim() || undefined,
+      assignedAgentId: raw.assignedAgentId?.trim() || undefined,
+      status: (raw.status as TicketStatus) || undefined,
+      priority: raw.priority?.trim() || undefined,
+      overdue: raw.overdue === 'true' ? true : undefined,
+    };
   }
 
   getStatusBadgeClasses(status: TicketStatus): string {
@@ -332,6 +405,17 @@ export class TicketListComponent {
     return new Date(dateString).toLocaleDateString();
   }
 
+  formatDateTime(dateString: string): string {
+    return new Date(dateString).toLocaleString();
+  }
+
+  isSlaOverdue(ticket: Ticket): boolean {
+    if (!ticket.slaDueAt || ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
+      return false;
+    }
+    return new Date(ticket.slaDueAt).getTime() < Date.now();
+  }
+
   private paramsToSearchParams(params: ParamMap): TicketSearchParams {
     return {
       q: params.get('q') || undefined,
@@ -339,6 +423,8 @@ export class TicketListComponent {
       customerId: params.get('customerId') || undefined,
       assignedAgentId: params.get('assignedAgentId') || undefined,
       status: (params.get('status') as TicketStatus) || undefined,
+      priority: params.get('priority') || undefined,
+      overdue: params.get('overdue') === 'true' ? true : undefined,
       page: parseInt(params.get('page') || '1', 10),
       limit: parseInt(params.get('limit') || '10', 10),
     };
@@ -352,6 +438,8 @@ export class TicketListComponent {
     if (params.customerId) queryParams.customerId = params.customerId;
     if (params.assignedAgentId) queryParams.assignedAgentId = params.assignedAgentId;
     if (params.status) queryParams.status = params.status;
+    if (params.priority) queryParams.priority = params.priority;
+    if (params.overdue === true || params.overdue === 'true') queryParams.overdue = 'true';
     if (params.page && params.page > 1) queryParams.page = params.page;
     if (params.limit && params.limit !== 10) queryParams.limit = params.limit;
 

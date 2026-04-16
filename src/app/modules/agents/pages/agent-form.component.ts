@@ -78,11 +78,20 @@ type AgentFormMode = 'invite' | 'create' | 'edit';
           below.
         </p>
 
-        <div class="mt-6 grid gap-4 md:grid-cols-3">
+        <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div class="rounded-3xl border border-emerald-200 bg-white p-4">
             <p class="text-sm font-medium text-slate-500">Auth user</p>
             <p class="mt-2 break-all text-base font-semibold text-slate-950">
               {{ inviteResult()?.userId }}
+            </p>
+          </div>
+          <div class="rounded-3xl border border-emerald-200 bg-white p-4">
+            <p class="text-sm font-medium text-slate-500">Default login password</p>
+            <p class="mt-2 break-all text-base font-semibold text-slate-950">
+              {{ inviteResult()?.defaultLoginPassword || 'password123' }}
+            </p>
+            <p class="mt-2 text-xs leading-5 text-slate-600">
+              Sign in with the agent email and this password. Change it after first login.
             </p>
           </div>
           <div class="rounded-3xl border border-emerald-200 bg-white p-4">
@@ -318,8 +327,8 @@ export class AgentFormComponent {
     }
 
     return this.isInviteMode()
-      ? 'Send an onboarding invite that provisions both the auth user and the agent record.'
-      : 'Create an agent record directly for operational setup or seeded workspace data.';
+      ? 'Creates the auth user with default password password123 (configurable on server), provisions the agent via events, and sends the invite email.'
+      : 'Creates only the agent profile in user-service (no login account). Use Invite agent to create sign-in with default password password123.';
   });
   readonly submitLabel = computed(() => {
     if (this.isSaving()) {
@@ -345,10 +354,10 @@ export class AgentFormComponent {
   );
   readonly modeHint = computed(() =>
     this.isInviteMode()
-      ? 'This uses the auth invite endpoint, which creates the user account first and then provisions the agent through the existing event flow.'
+      ? 'Auth invite sets the initial password to password123 (unless the server overrides DEFAULT_AGENT_INVITE_PASSWORD); the agent can log in once provisioning links their profile.'
       : this.isEditMode()
         ? 'Keep names readable, teams consistent, and skills specific enough for managers to search quickly.'
-        : 'Direct create skips password setup and writes the agent record immediately using the user-service endpoint.',
+        : 'Direct create does not create an auth login. Choose Invite if the teammate needs to sign in with email + password123.',
   );
   readonly cancelPath = computed(() => {
     const agentId = this.agentId();

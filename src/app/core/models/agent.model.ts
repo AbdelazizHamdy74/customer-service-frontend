@@ -51,6 +51,8 @@ export interface AgentInviteResult {
   userId: string;
   inviteToken: string;
   inviteTokenExpiresAt: string;
+  /** Matches auth-service default for invited agents (sign in with account email). */
+  defaultLoginPassword?: string;
 }
 
 export interface AgentSearchParams {

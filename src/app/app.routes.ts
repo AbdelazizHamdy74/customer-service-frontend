@@ -20,6 +20,7 @@ import { CustomerListComponent } from './modules/customers/pages/customer-list.c
 import { WorkspaceDashboardComponent } from './modules/workspace/pages/dashboard.component';
 import { TicketDetailsComponent } from './modules/tickets/pages/ticket-details.component';
 import { TicketFormComponent } from './modules/tickets/pages/ticket-form.component';
+import { AuditLogComponent } from './modules/tickets/pages/audit-log.component';
 import { TicketListComponent } from './modules/tickets/pages/ticket-list.component';
 import { PlaceholderPageComponent } from './shared/pages/placeholder-page.component';
 
@@ -87,6 +88,10 @@ const createStaffChildren = (roleLabel: string): Routes => [
         component: TicketDetailsComponent,
       },
     ],
+  },
+  {
+    path: 'audit-log',
+    component: AuditLogComponent,
   },
   {
     path: 'agents',

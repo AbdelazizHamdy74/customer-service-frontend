@@ -1,4 +1,5 @@
 export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'WAITING_CUSTOMER' | 'RESOLVED' | 'CLOSED';
+export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type TicketSource = 'api' | 'mock';
 
 export interface TicketComment {
@@ -26,6 +27,8 @@ export interface Ticket {
   customerId: string;
   assignedAgentId?: string | null;
   status: TicketStatus;
+  priority?: TicketPriority;
+  slaDueAt?: string | null;
   comments: TicketComment[];
   history: TicketHistory[];
   createdBy?: string | null;
@@ -41,6 +44,7 @@ export interface TicketUpsertPayload {
   customerId?: string;
   assignedAgentId?: string | null;
   status?: TicketStatus;
+  priority?: TicketPriority;
 }
 
 export interface TicketAssignPayload {
@@ -54,8 +58,28 @@ export interface TicketSearchParams {
   customerId?: string;
   assignedAgentId?: string;
   status?: TicketStatus | '';
+  priority?: string;
+  overdue?: boolean | string;
   page?: number;
   limit?: number;
+}
+
+export interface CannedResponseItem {
+  id: string;
+  title: string;
+  body: string;
+  category: string;
+}
+
+export interface AuditLogItem {
+  id: string;
+  action: string;
+  actorId?: string | null;
+  actorRole?: string | null;
+  resourceType: string;
+  resourceId?: string | null;
+  meta?: unknown;
+  createdAt: string;
 }
 
 export interface TicketPagination {
